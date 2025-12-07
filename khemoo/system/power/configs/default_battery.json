@@ -1,0 +1,36 @@
+{
+  "capacity_ah": 3.2,
+  "soc_init": 1.0,
+  "r0": 0.05,
+  "r1": 0.02,
+  "c1": 2500.0,
+  "model": { "type": "thevenin" },
+  "temperature_C": 25.0,
+  "temp_ref_C": 25.0,
+  "temp_coeff_V_per_C": 0.0,
+  "ocv_curve": [
+    { "soc": 0.0, "v": 3.0 },
+    { "soc": 0.1, "v": 3.3 },
+    { "soc": 0.2, "v": 3.45 },
+    { "soc": 0.4, "v": 3.65 },
+    { "soc": 0.6, "v": 3.75 },
+    { "soc": 0.8, "v": 3.95 },
+    { "soc": 1.0, "v": 4.15 }
+  ],
+  "degradation_breakpoints": [
+    { "soc_max": 0.8, "label": "nominal" },
+    { "soc_max": 0.5, "label": "reduced" },
+    { "soc_max": 0.3, "label": "constrained" },
+    { "soc_max": 0.15, "label": "critical" }
+  ],
+  "shepherd": {
+    "e0": 3.7,
+    "k": 0.01,
+    "a_exp": 0.1,
+    "b_exp": 3.0
+  },
+  "nernst": {
+    "e0": 3.7,
+    "k": 0.12
+  }
+}
