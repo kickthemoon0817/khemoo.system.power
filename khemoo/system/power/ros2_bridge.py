@@ -28,6 +28,7 @@ class BatteryROS2Bridge:
         self._battery_pub = None
         self._sensor_health_pub = None
         self._SensorHealth = None
+        self._sensor_health_fallback_json = False
         self._lock = threading.Lock()
         self._rclpy_ok = self._init_rclpy()
 
@@ -37,6 +38,8 @@ class BatteryROS2Bridge:
         try:
             import rclpy
             from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
+            from rclpy.parameter import Parameter
+            from std_msgs.msg import String  # fallback for sensor health
             from sensor_msgs.msg import BatteryState
         except Exception as exc:
             carb.log_warn(f"[BatteryROS2Bridge] rclpy not available, skipping ROS2 publishing: {exc}")
@@ -54,7 +57,17 @@ class BatteryROS2Bridge:
         )
         self._node = rclpy.create_node(self.node_name)
         if self._use_sim_time:
-            self._node.set_parameters_by_dict({"use_sim_time": True})
+            try:
+                self._node.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
+            except Exception:
+                try:
+                    try:
+                        self._node.declare_parameter("use_sim_time", True)
+                    except Exception:
+                        pass  # Already declared or declaration not needed
+                    self._node.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
+                except Exception as exc:
+                    carb.log_warn(f"[BatteryROS2Bridge] Failed to set use_sim_time parameter: {exc}")
 
         self._battery_pub = self._node.create_publisher(BatteryState, "/battery/state", qos)
 
@@ -64,7 +77,16 @@ class BatteryROS2Bridge:
             self._SensorHealth = SensorHealth
             self._sensor_health_pub = self._node.create_publisher(SensorHealth, "/battery/sensor_health", qos)
         except Exception as exc:
-            carb.log_warn(f"[BatteryROS2Bridge] SensorHealth message unavailable, will publish battery only: {exc}")
+            carb.log_warn(
+                f"[BatteryROS2Bridge] SensorHealth message unavailable ({exc}); using JSON fallback on /battery/sensor_health_json"
+            )
+            self._sensor_health_fallback_json = True
+            self._SensorHealth = String
+            try:
+                self._sensor_health_pub = self._node.create_publisher(String, "/battery/sensor_health_json", qos)
+            except Exception as pub_exc:
+                carb.log_error(f"[BatteryROS2Bridge] Failed to create fallback sensor_health publisher: {pub_exc}")
+                self._sensor_health_pub = None
 
         return True
 
@@ -94,20 +116,30 @@ class BatteryROS2Bridge:
                     if not hasattr(sensor, "get_health_report"):
                         continue
                     report = sensor.get_health_report()
-                    smsg = self._SensorHealth()
-                    # Defensive population; ignore missing fields in the message type
-                    if hasattr(smsg, "name"):
-                        smsg.name = str(report.get("name", ""))
-                    if hasattr(smsg, "health"):
-                        smsg.health = str(report.get("health", ""))
-                    if hasattr(smsg, "soc"):
-                        smsg.soc = float(report.get("soc", 0.0))
-                    if hasattr(smsg, "voltage"):
-                        smsg.voltage = float(report.get("voltage", 0.0))
-                    if hasattr(smsg, "drop_prob"):
-                        smsg.drop_prob = float(report.get("drop_prob", 0.0))
-                    if hasattr(smsg, "latency_jitter"):
-                        smsg.latency_jitter = float(report.get("latency_jitter", 0.0))
+                    if self._sensor_health_fallback_json:
+                        try:
+                            import json
+
+                            payload = json.dumps(report)
+                        except Exception:
+                            payload = "{}"
+                        smsg = self._SensorHealth()
+                        smsg.data = payload
+                    else:
+                        smsg = self._SensorHealth()
+                        # Defensive population; ignore missing fields in the message type
+                        if hasattr(smsg, "name"):
+                            smsg.name = str(report.get("name", ""))
+                        if hasattr(smsg, "health"):
+                            smsg.health = str(report.get("health", ""))
+                        if hasattr(smsg, "soc"):
+                            smsg.soc = float(report.get("soc", 0.0))
+                        if hasattr(smsg, "voltage"):
+                            smsg.voltage = float(report.get("voltage", 0.0))
+                        if hasattr(smsg, "drop_prob"):
+                            smsg.drop_prob = float(report.get("drop_prob", 0.0))
+                        if hasattr(smsg, "latency_jitter"):
+                            smsg.latency_jitter = float(report.get("latency_jitter", 0.0))
                     self._sensor_health_pub.publish(smsg)
 
         rclpy.spin_once(self._node, timeout_sec=0.0)
