@@ -1,0 +1,50 @@
+[package]
+title = "Battery-Aware Sensors"
+description = "Battery/power-aware simulation utilities with sensor degradation and ROS 2 streaming."
+category = "simulation"
+version = "0.1.0"
+authors = ["khemoo"]
+readme = "docs/README.md"
+repository = ""
+keywords = ["isaac", "battery", "sensors", "ros2", "power"]
+writeTarget.kit = true
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.timeline" = {}
+"omni.usd" = {}
+"isaacsim.simulation_app" = {}
+"isaacsim.core.api" = {}
+"isaacsim.sensors.camera" = {}
+"isaacsim.sensors.physics" = {}
+
+[[python.module]]
+name = "khemoo.system.power"
+
+[[python.module]]
+name = "khemoo.system.power.tests"
+
+[[test]]
+name = "startup"
+args = [
+  "--no-window",
+  "--/windowless=1",
+  "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+  "--/app/file/ignoreUnsavedStage=1",
+]
+stdoutFailPatterns.exclude = [
+  "*GLInteropContext::init: carb::windowing is not available*"
+]
+
+[[test]]
+name = "python-tests"
+pythonTests.include = ["khemoo.system.power.tests.*"]
+args = [
+    "--no-window",
+    "--/windowless=1",
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+    "--/app/file/ignoreUnsavedStage=1",
+]
+stdoutFailPatterns.exclude = [
+    "*GLInteropContext::init: carb::windowing is not available*"
+]
